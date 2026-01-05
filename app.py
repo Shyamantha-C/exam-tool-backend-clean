@@ -274,20 +274,31 @@ def student_login():
     email = data.get("email", "").lower().strip()
     password = data.get("password", "").strip()
 
-    if ALLOWED.get(email) != password:
-        return jsonify({"error": "invalid"}), 401
+    student = ALLOWED.get(email)
 
-    student = Student.query.filter_by(email=email).first()
     if not student:
-        student = Student(
+        return jsonify({"error": "invalid", "msg": "Email not found"}), 401
+
+    if student["phone"] != password:
+        return jsonify({"error": "invalid", "msg": "Wrong password"}), 401
+
+    # Create student in DB if not exists
+    db_student = Student.query.filter_by(email=email).first()
+    if not db_student:
+        db_student = Student(
             email=email,
-            phone=password,
-            name=email.split("@")[0]
+            phone=student["phone"],
+            name=student["name"]
         )
-        db.session.add(student)
+        db.session.add(db_student)
         db.session.commit()
 
-    return jsonify({"status": "ok", "student_id": student.id})
+    return jsonify({
+        "status": "ok",
+        "student_id": db_student.id,
+        "name": student["name"]
+    })
+
 
 @app.route("/api/admin/set-exam-time", methods=["POST"])
 def set_exam_time():
