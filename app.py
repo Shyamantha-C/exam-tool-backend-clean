@@ -182,6 +182,35 @@ def get_excel_students():
         "students": students
     })
 
+@app.route("/api/admin/delete-excel-student", methods=["DELETE"])
+def delete_excel_student():
+    if not is_admin(request):
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.json or {}
+    email = (data.get("email") or "").lower().strip()
+
+    if not email or email not in ALLOWED:
+        return jsonify({"error": "student not found"}), 404
+
+    # Remove from memory
+    del ALLOWED[email]
+
+    # Rewrite Excel file
+    try:
+        df = pd.DataFrame(
+            [{"email": e, "phone": p} for e, p in ALLOWED.items()]
+        )
+        df.to_excel(ALLOWED_XLSX, index=False)
+        load_allowed_students()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    return jsonify({
+        "status": "ok",
+        "total": len(ALLOWED)
+    })
+
 
 @app.route("/api/admin/add-question", methods=["POST"])
 def add_question():
