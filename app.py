@@ -100,11 +100,11 @@ def load_allowed_students():
         phone = str(row[phone_col]).strip()
         name = str(row[name_col]).strip() if name_col else email.split("@")[0]
 
-    if "@" in email and len(phone) >= 10:
-        ALLOWED[email] = {
-            "name": name,
-            "phone": phone[-10:]
-        }
+        if "@" in email and len(phone) >= 10:
+            ALLOWED[email] = {
+                "name": name,
+                "phone": phone[-10:]
+            }
 
     print(f"Loaded {len(ALLOWED)} students")
 
