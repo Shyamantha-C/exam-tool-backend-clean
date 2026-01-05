@@ -79,11 +79,14 @@ def load_allowed_students():
 
     df = pd.read_excel(ALLOWED_XLSX)
 
+    name_col = None
     email_col = None
     phone_col = None
 
-    for col in df.columns:
+    for col in df.columns: # pyright: ignore[reportUndefinedVariable]
         c = str(col).lower()
+        if "name" in c:
+            name_col = col
         if "email" in c:
             email_col = col
         if "phone" in c or "mobile" in c:
@@ -92,11 +95,16 @@ def load_allowed_students():
     if not email_col or not phone_col:
         raise RuntimeError("Excel must contain email & phone columns")
 
-    for _, row in df.iterrows():
+    for _, row in df.iterrows(): # pyright: ignore[reportUndefinedVariable]
         email = str(row[email_col]).strip().lower()
         phone = str(row[phone_col]).strip()
-        if "@" in email and len(phone) >= 10:
-            ALLOWED[email] = phone[-10:]
+        name = str(row[name_col]).strip() if name_col else email.split("@")[0]
+
+    if "@" in email and len(phone) >= 10:
+        ALLOWED[email] = {
+            "name": name,
+            "phone": phone[-10:]
+        }
 
     print(f"Loaded {len(ALLOWED)} students")
 
@@ -167,14 +175,14 @@ def get_excel_students():
 
     students = []
     i = 1
-    for email, phone in ALLOWED.items():
+    for email, data in ALLOWED.items():
         students.append({
-            "id": i,
-            "name": email.split("@")[0],
-            "email": email,
-            "phone": phone
-        })
-        i += 1
+        "id": i,
+        "name": data["name"],
+        "email": email,
+        "phone": data["phone"]
+    })
+    i += 1
 
     return jsonify({
         "status": "ok",
@@ -199,7 +207,11 @@ def delete_excel_student():
     # Rewrite Excel file
     try:
         df = pd.DataFrame(
-            [{"email": e, "phone": p} for e, p in ALLOWED.items()]
+            [{
+                "name":data["name"],
+                "email":email,
+                "phone":data["phone"]
+            } for email, data in ALLOWED.items()]
         )
         df.to_excel(ALLOWED_XLSX, index=False)
         load_allowed_students()
