@@ -42,22 +42,7 @@ with app.app_context():
 # =========================
 # Admin Auth (UserID + Password)
 # =========================
-ADMIN_USERS_RAW = os.environ.get("ADMIN_USERS")
-if not ADMIN_USERS_RAW:
-    raise RuntimeError("ADMIN_USERS env variable not set")
 
-# Parse: user:pass,user:pass
-ADMIN_USERS = {}
-for pair in ADMIN_USERS_RAW.split(","):
-    if ":" in pair:
-        user, pwd = pair.split(":", 1)
-        ADMIN_USERS[user.strip()] = pwd.strip()
-
-# Generate tokens (simple but stable)
-ADMIN_TOKENS = {
-    user: f"TOKEN_{user}_{pwd}"
-    for user, pwd in ADMIN_USERS.items()
-}
 
 def is_admin(req):
     token = req.headers.get("X-ADMIN-TOKEN")
