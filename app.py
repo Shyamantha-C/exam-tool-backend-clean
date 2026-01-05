@@ -8,6 +8,10 @@ import pandas as pd
 from models import db, Student, Question, Attempt, Answer
 
 # =========================
+# Exam time Shedule
+# =========================
+EXAM_START_TIME = None
+# =========================
 # App Setup
 # =========================
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -188,6 +192,33 @@ def student_login():
         db.session.commit()
 
     return jsonify({"status": "ok", "student_id": student.id})
+
+@app.route("/api/admin/set-exam-time", methods=["POST"])
+def set_exam_time():
+    if not is_admin(request):
+        return jsonify({"status": "error"}), 403
+    
+    data = request.json
+    time_str = data.get("datetime")  # format: "2025-04-05T19:00"
+    
+    try:
+        EXAM_START_TIME = datetime.fromisoformat(time_str.replace("T", " "))
+        return jsonify({
+            "status": "ok", 
+            "msg": f"Exam scheduled for {EXAM_START_TIME.strftime('%d %B %Y, %I:%M %p')}"
+        })
+    except:
+        return jsonify({"status": "error", "msg": "Invalid time format"})
+
+@app.route("/api/exam-time")
+def get_exam_time():
+    if EXAM_START_TIME:
+        return jsonify({
+            "scheduled": True,
+            "start_time": EXAM_START_TIME.isoformat(),
+            "time_str": EXAM_START_TIME.strftime("%d %B %Y, %I:%M %p")
+        })
+    return jsonify({"scheduled": False})
 
 @app.route("/api/start", methods=["POST"])
 def start_exam():
