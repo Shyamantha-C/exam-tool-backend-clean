@@ -4,6 +4,7 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+
 class Student(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     roll_no = db.Column(db.String, nullable=True)
@@ -39,6 +40,11 @@ class Answer(db.Model):
     selected = db.Column(db.String(5))
     answered_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+class Admin(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
 
 
 

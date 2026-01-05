@@ -61,7 +61,7 @@ ADMIN_TOKENS = {
 
 def is_admin(req):
     token = req.headers.get("X-ADMIN-TOKEN")
-    return token in ADMIN_TOKENS.values()
+    return token in ADMIN_TOKENS
 
 # =========================
 # Allowed Students (Excel)
@@ -105,19 +105,26 @@ load_allowed_students()
 # =========================
 # Admin APIs
 # =========================
+from models import Admin
+import secrets
+
+ADMIN_TOKENS = {}  # token → admin_id
+
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
     data = request.json or {}
-    user_id = data.get("userId")
+    username = data.get("username")
     password = data.get("password")
 
-    if user_id in ADMIN_USERS and ADMIN_USERS[user_id] == password:
-        return jsonify({
-            "status": "ok",
-            "token": ADMIN_TOKENS[user_id]
-        })
+    admin = Admin.query.filter_by(username=username, password=password).first()
 
-    return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
+    if not admin:
+        return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
+
+    token = secrets.token_hex(16)
+    ADMIN_TOKENS[token] = admin.id
+
+    return jsonify({"status": "ok", "token": token})
 
 @app.route("/api/admin/upload-students", methods=["POST"])
 def upload_students():
