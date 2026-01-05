@@ -4,12 +4,12 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import pandas as pd
-
-from models import db, Student, Question, Attempt, Answer
 import secrets
 
+from models import db, Student, Question, Attempt, Answer
+
 # =============================
-# ADMIN CONFIG (TEMP, SIMPLE)
+# ADMIN CONFIG (SIMPLE, IN-CODE)
 # =============================
 ADMINS = {
     "admin1": "admin123",
@@ -18,19 +18,15 @@ ADMINS = {
 
 ADMIN_TOKENS = set()
 
-# =========================
-# Exam time Shedule
-# =========================
-EXAM_START_TIME = None
-# =========================
+# =============================
 # App Setup
-# =========================
+# =============================
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# =========================
+# =============================
 # Static Frontend
-# =========================
+# =============================
 @app.route('/')
 def index():
     return send_from_directory('.', 'admin-login.html')
@@ -41,9 +37,9 @@ def serve_static(path):
         return send_from_directory('.', path)
     return send_from_directory('.', 'admin-login.html')
 
-# =========================
+# =============================
 # Database (SQLite)
-# =========================
+# =============================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_PATH = os.path.join(BASE_DIR, "exam.db")
 
@@ -54,18 +50,16 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
-# =========================
-# Admin Auth (UserID + Password)
-# =========================
-
-
+# =============================
+# Admin Auth
+# =============================
 def is_admin(req):
     token = req.headers.get("X-ADMIN-TOKEN")
     return token in ADMIN_TOKENS
 
-# =========================
+# =============================
 # Allowed Students (Excel)
-# =========================
+# =============================
 ALLOWED_XLSX = os.path.join(BASE_DIR, "allowed_students.xlsx")
 ALLOWED = {}
 
@@ -79,11 +73,9 @@ def load_allowed_students():
 
     df = pd.read_excel(ALLOWED_XLSX)
 
-    name_col = None
-    email_col = None
-    phone_col = None
+    name_col = email_col = phone_col = None
 
-    for col in df.columns: # pyright: ignore[reportUndefinedVariable]
+    for col in df.columns:
         c = str(col).lower()
         if "name" in c:
             name_col = col
@@ -93,9 +85,9 @@ def load_allowed_students():
             phone_col = col
 
     if not email_col or not phone_col:
-        raise RuntimeError("Excel must contain email & phone columns")
+        raise RuntimeError("Excel must contain Email and Phone columns")
 
-    for _, row in df.iterrows(): # pyright: ignore[reportUndefinedVariable]
+    for _, row in df.iterrows():
         email = str(row[email_col]).strip().lower()
         phone = str(row[phone_col]).strip()
         name = str(row[name_col]).strip() if name_col else email.split("@")[0]
@@ -110,50 +102,21 @@ def load_allowed_students():
 
 load_allowed_students()
 
-# =========================
+# =============================
 # Admin APIs
-# =========================
-# from models import Admin
-# import secrets
-
-# ADMIN_TOKENS = {}  # token → admin_id
-
-# @app.route("/api/admin/login", methods=["POST"])
-# def admin_login():
-#     data = request.json or {}
-#     username = data.get("username")
-#     password = data.get("password")
-
-#     admin = Admin.query.filter_by(username=username, password=password).first()
-
-#     if not admin:
-#         return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
-
-#     token = secrets.token_hex(16)
-#     ADMIN_TOKENS[token] = admin.id
-
-#     return jsonify({"status": "ok", "token": token})
-
+# =============================
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
     data = request.json or {}
     username = data.get("username")
     password = data.get("password")
 
-    if not username or not password:
-        return jsonify({"status": "error", "msg": "Missing credentials"}), 400
-
     if username not in ADMINS or ADMINS[username] != password:
         return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
 
     token = secrets.token_hex(16)
     ADMIN_TOKENS.add(token)
-
-    return jsonify({
-        "status": "ok",
-        "token": token
-    })
-
+    return jsonify({"status": "ok", "token": token})
 
 @app.route("/api/admin/upload-students", methods=["POST"])
 def upload_students():
@@ -177,12 +140,12 @@ def get_excel_students():
     i = 1
     for email, data in ALLOWED.items():
         students.append({
-        "id": i,
-        "name": data["name"],
-        "email": email,
-        "phone": data["phone"]
-    })
-    i += 1
+            "id": i,
+            "name": data["name"],
+            "email": email,
+            "phone": data["phone"]
+        })
+        i += 1
 
     return jsonify({
         "status": "ok",
@@ -195,34 +158,20 @@ def delete_excel_student():
     if not is_admin(request):
         return jsonify({"error": "forbidden"}), 403
 
-    data = request.json or {}
-    email = (data.get("email") or "").lower().strip()
-
-    if not email or email not in ALLOWED:
+    email = (request.json or {}).get("email", "").lower().strip()
+    if email not in ALLOWED:
         return jsonify({"error": "student not found"}), 404
 
-    # Remove from memory
     del ALLOWED[email]
 
-    # Rewrite Excel file
-    try:
-        df = pd.DataFrame(
-            [{
-                "name":data["name"],
-                "email":email,
-                "phone":data["phone"]
-            } for email, data in ALLOWED.items()]
-        )
-        df.to_excel(ALLOWED_XLSX, index=False)
-        load_allowed_students()
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    df = pd.DataFrame([
+        {"name": v["name"], "email": k, "phone": v["phone"]}
+        for k, v in ALLOWED.items()
+    ])
+    df.to_excel(ALLOWED_XLSX, index=False)
+    load_allowed_students()
 
-    return jsonify({
-        "status": "ok",
-        "total": len(ALLOWED)
-    })
-
+    return jsonify({"status": "ok", "total": len(ALLOWED)})
 
 @app.route("/api/admin/add-question", methods=["POST"])
 def add_question():
@@ -265,9 +214,9 @@ def get_questions():
         "per_question_time": q.per_question_time
     } for q in qs])
 
-# =========================
+# =============================
 # Student APIs
-# =========================
+# =============================
 @app.route("/api/student/login", methods=["POST"])
 def student_login():
     data = request.json or {}
@@ -275,14 +224,12 @@ def student_login():
     password = data.get("password", "").strip()
 
     student = ALLOWED.get(email)
-
     if not student:
         return jsonify({"error": "invalid", "msg": "Email not found"}), 401
 
     if student["phone"] != password:
         return jsonify({"error": "invalid", "msg": "Wrong password"}), 401
 
-    # Create student in DB if not exists
     db_student = Student.query.filter_by(email=email).first()
     if not db_student:
         db_student = Student(
@@ -298,34 +245,6 @@ def student_login():
         "student_id": db_student.id,
         "name": student["name"]
     })
-
-
-@app.route("/api/admin/set-exam-time", methods=["POST"])
-def set_exam_time():
-    if not is_admin(request):
-        return jsonify({"status": "error"}), 403
-    
-    data = request.json
-    time_str = data.get("datetime")  # format: "2025-04-05T19:00"
-    
-    try:
-        EXAM_START_TIME = datetime.fromisoformat(time_str.replace("T", " "))
-        return jsonify({
-            "status": "ok", 
-            "msg": f"Exam scheduled for {EXAM_START_TIME.strftime('%d %B %Y, %I:%M %p')}"
-        })
-    except:
-        return jsonify({"status": "error", "msg": "Invalid time format"})
-
-@app.route("/api/exam-time")
-def get_exam_time():
-    if EXAM_START_TIME:
-        return jsonify({
-            "scheduled": True,
-            "start_time": EXAM_START_TIME.isoformat(),
-            "time_str": EXAM_START_TIME.strftime("%d %B %Y, %I:%M %p")
-        })
-    return jsonify({"scheduled": False})
 
 @app.route("/api/start", methods=["POST"])
 def start_exam():
@@ -371,12 +290,11 @@ def submit_exam():
         return jsonify({"error": "invalid attempt"}), 400
 
     for qid, sel in answers.items():
-        ans = Answer(
+        db.session.add(Answer(
             attempt_id=attempt_id,
             question_id=int(qid),
             selected=sel
-        )
-        db.session.add(ans)
+        ))
 
     db.session.flush()
 
@@ -392,15 +310,12 @@ def submit_exam():
 
     return jsonify({"status": "ok", "score": score})
 
-# =========================
+# =============================
 # Health Check
-# =========================
+# =============================
 @app.route("/api/health")
 def health():
     return jsonify({"status": "ok"})
 
-# =========================
-# Local Run
-# =========================
 if __name__ == "__main__":
     app.run(debug=True)
