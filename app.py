@@ -160,6 +160,29 @@ def upload_students():
     load_allowed_students()
     return jsonify({"status": "ok", "count": len(ALLOWED)})
 
+@app.route("/api/admin/excel-students", methods=["GET"])
+def get_excel_students():
+    if not is_admin(request):
+        return jsonify({"error": "forbidden"}), 403
+
+    students = []
+    i = 1
+    for email, phone in ALLOWED.items():
+        students.append({
+            "id": i,
+            "name": email.split("@")[0],
+            "email": email,
+            "phone": phone
+        })
+        i += 1
+
+    return jsonify({
+        "status": "ok",
+        "total": len(students),
+        "students": students
+    })
+
+
 @app.route("/api/admin/add-question", methods=["POST"])
 def add_question():
     if not is_admin(request):
